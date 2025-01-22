@@ -1,0 +1,59 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Output of `go build`
+*.out
+
+# Build artifacts
+*.o
+*.a
+*.pyc
+*.pyo
+
+# Dependency directories (for vendoring)
+vendor/
+Godeps/
+
+# IDE and editor files
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# Logs
+*.log
+
+# Temporary files
+*.tmp
+*.temp
+*.bak
+*.swp
+*.swo
+*.DS_Store
+Thumbs.db
+
+# Coverage files
+*.cover
+*.cov
+*.lcov
+*.coverprofile
+*.test
+
+# Configuration files
+.env
+.env.*
+config.json
+settings.json
+
+# Go mod files
+go.sum
+
+# Generated files by tools
+.gen/
+_codegen/
