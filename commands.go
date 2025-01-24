@@ -93,7 +93,7 @@ func PlayHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		},
 	})
 
-	voiceConnection, err := s.ChannelVoiceJoin(GUILD_ID, CHANNEL_ID, false, true)
+	voiceConnection, err := s.ChannelVoiceJoin(GUILD_ID, CHANNEL_ID, false, false)
 	if err != nil {
 		log.Printf("An error occurred trying to join the channel: %v", err)
 	}
