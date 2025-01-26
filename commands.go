@@ -1,18 +1,18 @@
 package main
 
 import (
+	"errors"
 	"log"
-	"runtime"
+	"regexp"
 	"strings"
-	"time"
+	"sync"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/kkdai/youtube/v2"
 )
 
 var (
-	// YouTube client
-	YTClient youtube.Client
+	vh *VoiceHandler
+	wg sync.WaitGroup
 
 	// Provide params for commands
 	Commands = []*discordgo.ApplicationCommand{
@@ -25,12 +25,16 @@ var (
 			Description: "Command to search for a song on YouTube",
 		},
 		{
+			Name:        "disconnect",
+			Description: "Disconnect the bot from the voice channel",
+		},
+		{
 			Name:        "play",
 			Description: "Command to play a song from YouTube",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Name:        "song",
-					Description: "Query or YouTube URL",
+					Description: "Provide Search Query or YouTube URL",
 					Type:        discordgo.ApplicationCommandOptionString,
 					Required:    true,
 				},
@@ -41,13 +45,14 @@ var (
 	// Map commands to their respective handler functions
 	CommandHandlers = map[string]func(s *discordgo.Session, i *discordgo.InteractionCreate){
 		"getusers": GetUsersHandler,
-		"search":   SearchHandler,
-		"play":     PlayHandler,
+		// "search":   SearchHandler,
+		"play":       PlayHandler,
+		"disconnect": DisconnectHandler,
 	}
 )
 
 func init() {
-	YTClient = youtube.Client{}
+	vh = NewVoiceHandler()
 }
 
 func RegisterCommands(s *discordgo.Session) {
@@ -61,66 +66,86 @@ func RegisterCommands(s *discordgo.Session) {
 	log.Println("Commands registered.")
 }
 
-func SearchHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	video, err := YTClient.GetVideo("https://www.youtube.com/watch?v=TS0C_pt08Go&t=1584s")
-	if err != nil {
-		log.Printf("An error occurred trying to get your video: %s", err)
-	}
-	log.Println("Video:", video)
-}
-
 func PlayHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	var query string
-	for _, options := range i.ApplicationCommandData().Options {
-		if options.Name == "song" {
-			query = options.StringValue()
-		}
-	}
+	GenerateResponse(s, i, discordgo.InteractionResponseDeferredChannelMessageWithSource, "")
 
+	// Extract query
+	query := i.ApplicationCommandData().Options[0].StringValue()
 	if query == "" {
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: "Please provide a song name or URL to play.",
-			},
-		})
+		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Please provide a valid song name or YouTube URL.")
+		return
 	}
 
-	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: "Now playing: " + query,
-		},
+	videoURL, err := resolveVideoURL(query)
+	if err != nil {
+		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Could not find a valid YouTube video.")
+		return
+	}
+
+	voiceConnection, err := vh.SetConnection(s)
+	if err != nil {
+		log.Printf("Error connecting to voice channel: %v", err)
+		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Error connecting to voice channel.")
+		return
+	}
+	defer voiceConnection.Close()
+
+	response := "Now playing: " + videoURL
+	s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		Content: &response,
 	})
 
-	voiceConnection, err := s.ChannelVoiceJoin(GUILD_ID, CHANNEL_ID, false, false)
-	if err != nil {
-		log.Printf("An error occurred trying to join the channel: %v", err)
+	// Play song
+	if err := PlaySong(videoURL, voiceConnection); err != nil {
+		log.Printf("Playback error: %v", err)
+		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Error playing the song.")
+		return
 	}
+}
 
-	voiceConnection.LogLevel = discordgo.LogWarning
-
-	for voiceConnection.Ready == false {
-		runtime.Gosched()
-	}
-
-	time.Sleep(time.Millisecond * 250)
-
-	// Check if the query is a url or a query
+func resolveVideoURL(query string) (string, error) {
 	if strings.HasPrefix(query, "http://www.youtube.com") || strings.HasPrefix(query, "https://www.youtube.com") {
-		PlaySong(query, voiceConnection)
+		youtubeRegex := regexp.MustCompile(`^(https?://)?(www\.)?(youtube\.com|youtu\.be)/(watch\?v=|embed/|v/)?([a-zA-Z0-9_-]+)`)
+		if youtubeRegex.MatchString(query) {
+			return query, nil
+		}
+		return "", errors.New("invalid YouTube URL")
 	}
 
-	voiceConnection.Close()
+	results, err := SearchYouTube(query)
+	if err != nil {
+		return "", err
+	}
+
+	return results[0], nil
 }
 
 func GetUsersHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	log.Println("Here are the users")
+	// Get list of users in the server
+	guildID := i.GuildID
+	members, err := s.GuildMembers(guildID, "", 1000)
+	if err != nil {
+		log.Printf("Error fetching members: %v", err)
+		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Error fetching members.")
+		return
+	}
 
-	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{
-			Content: "test",
-		},
-	})
+	// Format member list
+	var memberList []string
+	for _, member := range members {
+		memberList = append(memberList, member.User.Username)
+	}
+
+	// Respond with member list
+	response := "Members:\n" + strings.Join(memberList, "\n")
+	GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, response)
+}
+
+func DisconnectHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	voiceConnection := vh.GetConnection(GUILD_ID)
+	if voiceConnection != nil {
+		vh.Disconnect(s, GUILD_ID)
+		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Disconnected from voice channel.")
+	}
+	GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Not connected to any voice channel.")
 }

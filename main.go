@@ -25,7 +25,6 @@ func init() {
 	GUILD_ID = os.Getenv("DISCORD_GUILD")
 	CHANNEL_ID = os.Getenv("DISCORD_CHANNEL")
 
-	// Create a new Discord session
 	var err error
 	discord, err = discordgo.New("Bot " + API_KEY)
 	if err != nil {
@@ -34,18 +33,15 @@ func init() {
 
 	discord.LogLevel = discordgo.LogWarning
 
-	// Register the interaction handler for slash commands
 	discord.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		log.Printf("Received interaction: %s", i.ApplicationCommandData().Name)
-		// Check if a handler exists for the invoked command
 		if h, ok := CommandHandlers[i.ApplicationCommandData().Name]; ok {
-			h(s, i) // Call the handler function if found
+			h(s, i)
 		}
 	})
 }
 
 func main() {
-	// Open a WebSocket connection to Discord
 	err := discord.Open()
 	if err != nil {
 		log.Fatalf("Cannot open the session: %v", err)
@@ -58,7 +54,6 @@ func main() {
 	stop := make(chan os.Signal, 1)
 	signal.Notify(stop, os.Interrupt)
 
-	// Wait for interrupt signal
 	log.Println("Bot is running. Press Ctrl+C to exit.")
 	<-stop
 
