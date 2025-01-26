@@ -88,7 +88,6 @@ func PlayHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Error connecting to voice channel.")
 		return
 	}
-	defer voiceConnection.Close()
 
 	response := "Now playing: " + videoURL
 	s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
