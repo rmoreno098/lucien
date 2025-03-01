@@ -5,14 +5,14 @@ import (
 	"log"
 	"regexp"
 	"strings"
-	"sync"
 
 	"github.com/bwmarrin/discordgo"
 )
 
 var (
-	vh *VoiceHandler
-	wg sync.WaitGroup
+	vh  *VoiceHandler
+	aqh *AudioQueueHandler
+	res string
 
 	// Provide params for commands
 	Commands = []*discordgo.ApplicationCommand{
@@ -53,6 +53,7 @@ var (
 
 func init() {
 	vh = NewVoiceHandler()
+	aqh = NewAudioQueueHandler()
 }
 
 func RegisterCommands(s *discordgo.Session) {
@@ -62,21 +63,18 @@ func RegisterCommands(s *discordgo.Session) {
 			log.Fatalf("Error creating command: %v", err)
 		}
 	}
-
-	log.Println("Commands registered.")
 }
 
 func PlayHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	GenerateResponse(s, i, discordgo.InteractionResponseDeferredChannelMessageWithSource, "")
 
-	// Extract query
 	query := i.ApplicationCommandData().Options[0].StringValue()
 	if query == "" {
 		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Please provide a valid song name or YouTube URL.")
 		return
 	}
 
-	videoURL, err := resolveVideoURL(query)
+	videoURL, err := resolveQuery(query)
 	if err != nil {
 		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Could not find a valid YouTube video.")
 		return
@@ -89,20 +87,29 @@ func PlayHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	response := "Now playing: " + videoURL
+	q := aqh.GetQueue()
+	if vh.connections[GUILD_ID].IsPlaying || (len(q) > 0 && vh.connections[GUILD_ID].IsPlaying) {
+		aqh.AddToQueue(videoURL)
+		res = "Added " + videoURL + " to the queue."
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: &res,
+		})
+		return
+	}
+
+	res = "Now playing: " + videoURL
 	s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-		Content: &response,
+		Content: &res,
 	})
 
-	// Play song
-	if err := PlaySong(videoURL, voiceConnection); err != nil {
+	if err := PlaySong(videoURL, voiceConnection, aqh, vh); err != nil {
 		log.Printf("Playback error: %v", err)
 		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Error playing the song.")
 		return
 	}
 }
 
-func resolveVideoURL(query string) (string, error) {
+func resolveQuery(query string) (string, error) {
 	if strings.HasPrefix(query, "http://www.youtube.com") || strings.HasPrefix(query, "https://www.youtube.com") {
 		youtubeRegex := regexp.MustCompile(`^(https?://)?(www\.)?(youtube\.com|youtu\.be)/(watch\?v=|embed/|v/)?([a-zA-Z0-9_-]+)`)
 		if youtubeRegex.MatchString(query) {
@@ -143,6 +150,7 @@ func GetUsersHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 func DisconnectHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	voiceConnection := vh.GetConnection(GUILD_ID)
 	if voiceConnection != nil {
+		aqh.ClearQueue()
 		vh.Disconnect(s, GUILD_ID)
 		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Disconnected from voice channel.")
 	}

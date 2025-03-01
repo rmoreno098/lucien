@@ -10,6 +10,7 @@ import (
 type VoiceConnectionState struct {
 	VoiceConnection *discordgo.VoiceConnection
 	IsConnected     bool
+	IsPlaying       bool
 	GuildID         string
 	ChannelID       string
 }
@@ -47,7 +48,7 @@ func (vh *VoiceHandler) SetConnection(s *discordgo.Session) (*discordgo.VoiceCon
 
 	vc, err := s.ChannelVoiceJoin(GUILD_ID, CHANNEL_ID, false, true)
 	if err != nil {
-		log.Println("Error connecting to voice channel:", err)
+		log.Printf("Error connecting to voice channel: %v\n", err)
 		return nil, err
 	}
 

@@ -11,14 +11,8 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-// VideoInfo represents YouTube video information fetched by yt-dlp.
-type VideoInfo struct {
-	URL string `json:"url"`
-}
-
 // GetAudioURL fetches the audio stream URL using yt-dlp.
 func GetAudioURL(videoURL string) (string, error) {
-	// yt-dlp command to get the best audio stream URL in JSON format
 	cmd := exec.Command("yt-dlp", "-f", "bestaudio", "--get-url", videoURL)
 
 	var out bytes.Buffer
@@ -29,24 +23,30 @@ func GetAudioURL(videoURL string) (string, error) {
 		return "", err
 	}
 
-	// Return the first valid URL (trim any extra spaces/newlines)
 	return strings.TrimSpace(out.String()), nil
 }
 
-func PlaySong(videoURL string, vc *discordgo.VoiceConnection) error {
+func PlaySong(videoURL string, vc *discordgo.VoiceConnection, aqh *AudioQueueHandler, vh *VoiceHandler) error {
 	if vc == nil || vc.ChannelID == "" {
 		log.Println("Voice connection is nil or not properly initialized.")
 		return fmt.Errorf("voice connection is nil or not properly initialized")
 	}
 
-	// Get the audio stream URL
-	streamURL, err := GetAudioURL(videoURL)
+	var audio = videoURL
+
+	if len(aqh.GetQueue()) > 0 {
+		audio = aqh.RemoveFromQueue().URL
+	}
+
+	streamURL, err := GetAudioURL(audio)
 	if err != nil {
 		log.Printf("Error fetching audio stream URL: %v\n", err)
 		return err
 	}
 
+	vh.connections[GUILD_ID].IsPlaying = true
 	dgvoice.PlayAudioFile(vc, streamURL, make(chan bool))
+	vh.connections[GUILD_ID].IsPlaying = false
 
 	return nil
 }
