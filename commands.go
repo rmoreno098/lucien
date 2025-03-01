@@ -1,9 +1,7 @@
 package main
 
 import (
-	"errors"
 	"log"
-	"regexp"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
@@ -80,7 +78,7 @@ func PlayHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		return
 	}
 
-	voiceConnection, err := vh.SetConnection(s)
+	vc, err := vh.SetConnection(s)
 	if err != nil {
 		log.Printf("Error connecting to voice channel: %v", err)
 		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Error connecting to voice channel.")
@@ -88,9 +86,8 @@ func PlayHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	}
 
 	q := aqh.GetQueue()
-	if vh.connections[GUILD_ID].IsPlaying || (len(q) > 0 && vh.connections[GUILD_ID].IsPlaying) {
-		aqh.AddToQueue(videoURL)
-		res = "Added " + videoURL + " to the queue."
+	if len(q) > 0 || vh.connections[GUILD_ID].IsPlaying {
+		res := aqh.AddToQueue(videoURL)
 		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 			Content: &res,
 		})
@@ -102,28 +99,11 @@ func PlayHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		Content: &res,
 	})
 
-	if err := PlaySong(videoURL, voiceConnection, aqh, vh); err != nil {
+	if err := PlaySong(videoURL, vc, aqh, vh); err != nil {
 		log.Printf("Playback error: %v", err)
-		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Error playing the song.")
+		GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Error playing requested song.")
 		return
 	}
-}
-
-func resolveQuery(query string) (string, error) {
-	if strings.HasPrefix(query, "http://www.youtube.com") || strings.HasPrefix(query, "https://www.youtube.com") {
-		youtubeRegex := regexp.MustCompile(`^(https?://)?(www\.)?(youtube\.com|youtu\.be)/(watch\?v=|embed/|v/)?([a-zA-Z0-9_-]+)`)
-		if youtubeRegex.MatchString(query) {
-			return query, nil
-		}
-		return "", errors.New("invalid YouTube URL")
-	}
-
-	results, err := SearchYouTube(query)
-	if err != nil {
-		return "", err
-	}
-
-	return results[0], nil
 }
 
 func GetUsersHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
