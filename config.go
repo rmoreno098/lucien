@@ -1,4 +1,4 @@
-package main
+package config
 
 import (
 	"log"
@@ -15,7 +15,7 @@ type Configuration struct {
 
 func LoadConfig() Configuration {
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error loading .env file")
+		log.Fatalf("Error loading .env file: %v", err)
 	}
 
 	return Configuration{
