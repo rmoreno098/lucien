@@ -2,8 +2,8 @@ package bot
 
 import (
 	"fmt"
-	"log"
 	"lucien/internal/services"
+	"lucien/pkg/utils"
 	"sync"
 
 	"github.com/bwmarrin/dgvoice"
@@ -38,6 +38,7 @@ func (h *VoiceHandler) Play(request *TrackRequest) error {
 		return err
 	}
 
+	utils.GenerateResponse(request.Session, request.Interaction, discordgo.EndpointFollowupMessage(), fmt.Sprintf("Now playing: %s", request.Url))
 	done := make(chan bool)
 	dgvoice.PlayAudioFile(conn, audio, done)
 	<-done
@@ -50,14 +51,15 @@ func (h *VoiceHandler) SetConnection(s *discordgo.Session, i *discordgo.Interact
 	defer h.mu.Unlock()
 
 	guildID := i.GuildID
+
+	c, exists := h.connections[guildID]
+	if exists && c.IsConnected {
+		return c.VoiceConnection, nil
+	}
+
 	channelID, err := getUserVoiceChannelID(s, guildID, i.Member.User.ID)
 	if err != nil {
 		return nil, err
-	}
-
-	connEntry, exists := h.connections[guildID]
-	if exists && connEntry.IsConnected {
-		return connEntry.VoiceConnection, nil
 	}
 
 	conn, err := s.ChannelVoiceJoin(guildID, channelID, false, true)
@@ -74,13 +76,18 @@ func (h *VoiceHandler) SetConnection(s *discordgo.Session, i *discordgo.Interact
 	return conn, nil
 }
 
-func (h *VoiceHandler) getConnection(guildID string) *discordgo.VoiceConnection {
+func (h *VoiceHandler) Disconnect(guildID string) error {
 	h.mu.Lock()
 	defer h.mu.Unlock()
 
 	if conn, ok := h.connections[guildID]; ok {
-		return conn.VoiceConnection
+		err := conn.VoiceConnection.Disconnect()
+		if err != nil {
+			return err
+		}
+		delete(h.connections, guildID)
 	}
+
 	return nil
 }
 
@@ -90,16 +97,4 @@ func getUserVoiceChannelID(s *discordgo.Session, guildID, userID string) (string
 		return "", fmt.Errorf("user not in voice channel")
 	}
 	return vs.ChannelID, nil
-}
-
-func (h *VoiceHandler) Disconnect(s *discordgo.Session, guildID string) {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if conn, ok := h.connections[guildID]; ok && conn.IsConnected {
-		if err := conn.VoiceConnection.Disconnect(); err != nil {
-			log.Fatalf("Unable to disconnect voice connection: %v", err)
-		}
-		delete(h.connections, guildID)
-	}
 }

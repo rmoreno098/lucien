@@ -14,12 +14,12 @@ type DiscordRegister struct {
 func RegisterDiscordSession(service *discord.DiscordService) error {
 	s := registerServices()
 
+	registerCommands(service)
 	registerHandlers(service.Session, s)
 	if err := service.Session.Open(); err != nil {
 		return err
 	}
 
-	registerCommands(service)
 	return nil
 }
 
@@ -27,7 +27,7 @@ func registerServices() *DiscordHandler {
 	voice := NewVoiceHandler() // Manages a mapping of voice connections by guild
 	queue := NewAudioQueue()   // Manages a worker pool of threads to manage user requests
 
-	queue.StartWorkers(4, func(request *TrackRequest) error {
+	queue.StartWorkers(2, func(request *TrackRequest) error {
 		return voice.Play(request)
 	})
 
@@ -42,8 +42,9 @@ func registerHandlers(s *discordgo.Session, h *DiscordHandler) {
 		"play": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 			h.PlayHandler(s, i)
 		},
-		// "disconnect": DisconnectHandler,
-		// "getusers":   GetUsersHandler,
+		"disconnect": func(s *discordgo.Session, i *discordgo.InteractionCreate) {
+			h.DisconnectHandler(s, i)
+		},
 	}
 
 	s.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -86,7 +87,7 @@ func registerCommands(s *discord.DiscordService) {
 		},
 	}
 	for _, command := range commands {
-		_, err := s.Session.ApplicationCommandCreate(s.Session.State.User.ID, s.Guild, command)
+		_, err := s.Session.ApplicationCommandCreate(s.AppID, s.Guild, command)
 		if err != nil {
 			log.Fatalf("Error creating command: %v", err)
 		}

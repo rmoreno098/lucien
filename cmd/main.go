@@ -10,7 +10,7 @@ import (
 func main() {
 	c := config.LoadConfig()
 
-	d := discord.NewSession(c.DiscordSecret, c.DiscordGuild, c.DiscordChannelID)
+	d := discord.NewSession(c.DiscordSecret, c.DiscordGuild, c.DiscordChannelID, c.DiscordAppID)
 	if err := bot.RegisterDiscordSession(d); err != nil {
 		log.Fatalf("Unable to launch bot: %v", err)
 	}
