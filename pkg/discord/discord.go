@@ -10,9 +10,10 @@ type DiscordService struct {
 	Session   *discordgo.Session
 	Guild     string
 	ChannelID string
+	AppID     string
 }
 
-func NewSession(secret, guild, channel string) *DiscordService {
+func NewSession(secret, guild, channel, app string) *DiscordService {
 	session, err := discordgo.New("Bot " + secret)
 	if err != nil {
 		log.Fatalf("An error occurred initalizing Discord service: %v", err)
@@ -22,5 +23,6 @@ func NewSession(secret, guild, channel string) *DiscordService {
 		Session:   session,
 		Guild:     guild,
 		ChannelID: channel,
+		AppID:     app,
 	}
 }

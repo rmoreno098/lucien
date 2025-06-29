@@ -3,6 +3,7 @@ package bot
 import (
 	"errors"
 	"fmt"
+	"log"
 	"lucien/pkg/utils"
 	"regexp"
 	"strings"
@@ -16,6 +17,10 @@ type DiscordHandler struct {
 }
 
 func (h *DiscordHandler) PlayHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if h.Queue == nil {
+		utils.GenerateResponse(s, i, discordgo.InteractionResponseDeferredChannelMessageWithSource, "There is no queue!!!")
+	}
+
 	utils.GenerateResponse(s, i, discordgo.InteractionResponseDeferredChannelMessageWithSource, "")
 	q := i.ApplicationCommandData().Options[0].StringValue()
 
@@ -27,42 +32,24 @@ func (h *DiscordHandler) PlayHandler(s *discordgo.Session, i *discordgo.Interact
 
 	h.Queue.AddToQueue(url, s, i)
 
-	res := fmt.Sprintf("%s has been added to the queue", url)
+	res := fmt.Sprintf("Track has been added to the queue")
 	s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 		Content: &res,
 	})
 }
 
-// func GetUsersHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-// 	// // Get list of users in the server
-// 	// guildID := i.GuildID
-// 	// members, err := s.GuildMembers(guildID, "", 1000)
-// 	// if err != nil {
-// 	// 	log.Printf("Error fetching members: %v", err)
-// 	// 	utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Error fetching members.")
-// 	// 	return
-// 	// }
+func (h *DiscordHandler) DisconnectHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	guildID := i.GuildID
 
-// 	// // Format member list
-// 	// var memberList []string
-// 	// for _, member := range members {
-// 	// 	memberList = append(memberList, member.User.Username)
-// 	// }
+	if err := h.VoiceState.Disconnect(guildID); err != nil {
+		log.Printf("There was an error disconnecting: %v", err)
+		utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, err.Error())
+	}
+	h.Queue.Quit <- true
 
-// 	// // Respond with member list
-// 	// response := "Members:\n" + strings.Join(memberList, "\n")
-// 	// utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, response)
-// }
-
-// func DisconnectHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-// 	voiceConnection := vh.GetConnection(GUILD_ID)
-// 	if voiceConnection != nil {
-// 		aqh.ClearQueue()
-// 		vh.Disconnect(s, GUILD_ID)
-// 		utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Disconnected from voice channel.")
-// 	}
-// 	utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Not connected to any voice channel.")
-// }
+	log.Printf("Disconnected from %s", i.GuildID)
+	utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Disconnected from voice channel.")
+}
 
 func resolveQuery(query string) (string, error) {
 	if strings.HasPrefix(query, "http://www.youtube.com") || strings.HasPrefix(query, "https://www.youtube.com") {

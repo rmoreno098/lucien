@@ -11,6 +11,7 @@ type Configuration struct {
 	DiscordSecret    string
 	DiscordGuild     string
 	DiscordChannelID string
+	DiscordAppID     string
 }
 
 func LoadConfig() Configuration {
@@ -22,6 +23,7 @@ func LoadConfig() Configuration {
 		DiscordSecret:    getEnv("DISCORD_TOKEN", ""),
 		DiscordGuild:     getEnv("DISCORD_GUILD", ""),
 		DiscordChannelID: getEnv("DISCORD_CHANNEL", ""),
+		DiscordAppID:     getEnv("DISCORD_APP_ID", ""),
 	}
 }
 
