@@ -2,7 +2,6 @@ package bot
 
 import (
 	"errors"
-	"fmt"
 	"log"
 	"lucien/pkg/utils"
 	"regexp"
@@ -17,10 +16,6 @@ type DiscordHandler struct {
 }
 
 func (h *DiscordHandler) PlayHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if h.Queue == nil {
-		utils.GenerateResponse(s, i, discordgo.InteractionResponseDeferredChannelMessageWithSource, "There is no queue!!!")
-	}
-
 	utils.GenerateResponse(s, i, discordgo.InteractionResponseDeferredChannelMessageWithSource, "")
 	q := i.ApplicationCommandData().Options[0].StringValue()
 
@@ -30,22 +25,16 @@ func (h *DiscordHandler) PlayHandler(s *discordgo.Session, i *discordgo.Interact
 		return
 	}
 
-	h.Queue.AddToQueue(url, s, i)
+	h.Queue.AddToQueue(url, s, i, h.VoiceState)
 
-	res := fmt.Sprintf("Track has been added to the queue")
+	res := "Track has been added to the queue"
 	s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 		Content: &res,
 	})
 }
 
 func (h *DiscordHandler) DisconnectHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	guildID := i.GuildID
-
-	if err := h.VoiceState.Disconnect(guildID); err != nil {
-		log.Printf("There was an error disconnecting: %v", err)
-		utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, err.Error())
-	}
-	h.Queue.Quit <- true
+	h.Queue.EndQueue(s, i, h.VoiceState)
 
 	log.Printf("Disconnected from %s", i.GuildID)
 	utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Disconnected from voice channel.")
