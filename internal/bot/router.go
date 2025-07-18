@@ -27,10 +27,6 @@ func registerServices() *DiscordHandler {
 	voice := NewVoiceHandler() // Manages a mapping of voice connections by guild
 	queue := NewAudioQueue()   // Manages a worker pool of threads to manage user requests
 
-	queue.StartWorkers(2, func(request *TrackRequest) error {
-		return voice.Play(request)
-	})
-
 	return &DiscordHandler{
 		Queue:      queue,
 		VoiceState: voice,

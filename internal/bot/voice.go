@@ -2,11 +2,8 @@ package bot
 
 import (
 	"fmt"
-	"lucien/internal/services"
-	"lucien/pkg/utils"
 	"sync"
 
-	"github.com/bwmarrin/dgvoice"
 	"github.com/bwmarrin/discordgo"
 )
 
@@ -25,25 +22,6 @@ func NewVoiceHandler() *VoiceHandler {
 	return &VoiceHandler{
 		connections: make(map[string]*VoiceConnectionEntry),
 	}
-}
-
-func (h *VoiceHandler) Play(request *TrackRequest) error {
-	conn, err := h.SetConnection(request.Session, request.Interaction)
-	if err != nil {
-		return err
-	}
-
-	audio, err := services.GetAudioURL(request.Url)
-	if err != nil {
-		return err
-	}
-
-	utils.GenerateResponse(request.Session, request.Interaction, discordgo.EndpointFollowupMessage(), fmt.Sprintf("Now playing: %s", request.Url))
-	done := make(chan bool)
-	dgvoice.PlayAudioFile(conn, audio, done)
-	<-done
-
-	return nil
 }
 
 func (h *VoiceHandler) SetConnection(s *discordgo.Session, i *discordgo.InteractionCreate) (*discordgo.VoiceConnection, error) {
@@ -74,21 +52,6 @@ func (h *VoiceHandler) SetConnection(s *discordgo.Session, i *discordgo.Interact
 	}
 
 	return conn, nil
-}
-
-func (h *VoiceHandler) Disconnect(guildID string) error {
-	h.mu.Lock()
-	defer h.mu.Unlock()
-
-	if conn, ok := h.connections[guildID]; ok {
-		err := conn.VoiceConnection.Disconnect()
-		if err != nil {
-			return err
-		}
-		delete(h.connections, guildID)
-	}
-
-	return nil
 }
 
 func getUserVoiceChannelID(s *discordgo.Session, guildID, userID string) (string, error) {
