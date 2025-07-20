@@ -2,6 +2,7 @@ package bot
 
 import (
 	"fmt"
+	"log"
 	"sync"
 
 	"github.com/bwmarrin/discordgo"
@@ -32,6 +33,7 @@ func (h *VoiceHandler) SetConnection(s *discordgo.Session, i *discordgo.Interact
 
 	c, exists := h.connections[guildID]
 	if exists && c.IsConnected {
+		log.Printf("Found existing connection for guildID %v", guildID)
 		return c.VoiceConnection, nil
 	}
 
@@ -57,7 +59,7 @@ func (h *VoiceHandler) SetConnection(s *discordgo.Session, i *discordgo.Interact
 func getUserVoiceChannelID(s *discordgo.Session, guildID, userID string) (string, error) {
 	vs, err := s.State.VoiceState(guildID, userID)
 	if err != nil || vs == nil {
-		return "", fmt.Errorf("user not in voice channel")
+		return "", fmt.Errorf("User not in voice channel")
 	}
 	return vs.ChannelID, nil
 }
