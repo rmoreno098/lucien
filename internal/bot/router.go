@@ -25,7 +25,7 @@ func RegisterDiscordSession(service *discord.DiscordService) error {
 
 func registerServices() *DiscordHandler {
 	voice := NewVoiceHandler() // Manages a mapping of voice connections by guild
-	queue := NewAudioQueue()   // Manages a worker pool of threads to manage user requests
+	queue := NewAudioQueue()   // Manages a worker pool to manage user commands
 
 	return &DiscordHandler{
 		Queue:      queue,
@@ -45,6 +45,7 @@ func registerHandlers(s *discordgo.Session, h *DiscordHandler) {
 
 	s.AddHandler(func(s *discordgo.Session, i *discordgo.InteractionCreate) {
 		if i.Type != discordgo.InteractionApplicationCommand {
+			// handle different types in the future
 			return
 		}
 

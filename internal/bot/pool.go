@@ -7,20 +7,19 @@ type Task interface {
 }
 
 type WorkerPool struct {
-	Tasks   chan Task
-	handler func(Task) error
+	tasks   chan Task
 	workers int
 }
 
 func (p *WorkerPool) Start() {
 	for i := 0; i < p.workers; i++ {
 		go func(id int) {
-			for task := range p.Tasks {
+			for task := range p.tasks {
 				if task == nil {
 					log.Printf("Worker %v stopped", id)
 					return
 				}
-				if err := p.handler(task); err != nil {
+				if err := task.Execute(); err != nil {
 					log.Printf("An error occurred trying to execute task: %v", err)
 				}
 			}
@@ -28,6 +27,6 @@ func (p *WorkerPool) Start() {
 	}
 }
 
-func (p *WorkerPool) Execute(task Task) {
-	p.Tasks <- task
+func (p *WorkerPool) Submit(task Task) {
+	p.tasks <- task
 }

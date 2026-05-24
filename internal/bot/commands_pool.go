@@ -6,22 +6,10 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
-type Commands struct {
-	*WorkerPool
-}
-
-func NewCommandsPool() *Commands {
-	return &Commands{
-		WorkerPool: &WorkerPool{
-			Tasks: make(chan Task, 100),
-			handler: func(i Task) error {
-				if err := i.Execute(); err != nil {
-					return err
-				}
-				return nil
-			},
-			workers: 2,
-		},
+func NewCommandsPool() *WorkerPool {
+	return &WorkerPool{
+		tasks:   make(chan Task, 100),
+		workers: 2,
 	}
 }
 
@@ -43,7 +31,7 @@ func (h *StopQueue) Execute() error {
 			return err
 		}
 		delete(h.Voice.connections, guildID)
-		log.Printf("Disconnected from voice channel for guild: %v", guildID)
+		log.Printf("Removed guild from connections map: %v", guildID)
 		return nil
 	}
 	log.Printf("Could not find voice connection for guild: %v", guildID)
