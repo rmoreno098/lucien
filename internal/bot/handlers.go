@@ -2,6 +2,7 @@ package bot
 
 import (
 	"errors"
+	"fmt"
 	"log"
 	"lucien/pkg/utils"
 	"regexp"
@@ -16,28 +17,27 @@ type DiscordHandler struct {
 }
 
 func (h *DiscordHandler) PlayHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	utils.GenerateResponse(s, i, discordgo.InteractionResponseDeferredChannelMessageWithSource, "")
-	q := i.ApplicationCommandData().Options[0].StringValue()
-
-	url, err := resolveQuery(q)
+	userQuery := i.ApplicationCommandData().Options[0].StringValue()
+	url, err := resolveQuery(userQuery)
 	if err != nil {
 		utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Could not find a valid YouTube video.")
 		return
 	}
 
-	h.Queue.AddToQueue(url, s, i, h.VoiceState)
-
+	h.Queue.MusicPool.Submit(&PlaySongTask{url, s, i, h.VoiceState})
 	res := "Track has been added to the queue"
-	s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-		Content: &res,
-	})
+	utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, res)
 }
 
 func (h *DiscordHandler) DisconnectHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	h.Queue.EndQueue(s, i, h.VoiceState)
-
+	h.Queue.CommandsPool.Submit(&StopQueue{s, i, h.VoiceState})
 	log.Printf("Disconnected from %s", i.GuildID)
 	utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Disconnected from voice channel.")
+}
+
+func (h *DiscordHandler) ConnectionsStatus(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	list := fmt.Sprintf("Connections status: %v\n", h.VoiceState.connections)
+	utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, list)
 }
 
 func resolveQuery(query string) (string, error) {
