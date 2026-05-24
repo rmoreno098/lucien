@@ -16,4 +16,6 @@ func NewAudioQueue() *AudioQueue {
 		CommandsPool: cmd,
 		MusicPool:    music,
 	}
+	log.Printf("Could not find voice connection for guild: %v", guildID)
+	return nil
 }
