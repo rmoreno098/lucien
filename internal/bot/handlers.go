@@ -17,29 +17,26 @@ type DiscordHandler struct {
 }
 
 func (h *DiscordHandler) PlayHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	user_query := i.ApplicationCommandData().Options[0].StringValue()
-
-	url, err := resolveQuery(user_query)
+	userQuery := i.ApplicationCommandData().Options[0].StringValue()
+	url, err := resolveQuery(userQuery)
 	if err != nil {
 		utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Could not find a valid YouTube video.")
 		return
 	}
 
-	h.Queue.MusicPool.AddTask(url, s, i, h.VoiceState)
-
+	h.Queue.MusicPool.Submit(&PlaySongTask{url, s, i, h.VoiceState})
 	res := "Track has been added to the queue"
 	utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, res)
 }
 
 func (h *DiscordHandler) DisconnectHandler(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	h.Queue.CommandsPool.EndQueue(s, i, h.VoiceState)
-
+	h.Queue.CommandsPool.Submit(&StopQueue{s, i, h.VoiceState})
 	log.Printf("Disconnected from %s", i.GuildID)
 	utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, "Disconnected from voice channel.")
 }
 
-func (h *DiscordHandler) QueueStatus(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	list := fmt.Sprintf("h.Queue.MusicPool.MusicMap: %v\n", h.Queue.MusicPool.MusicMap)
+func (h *DiscordHandler) ConnectionsStatus(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	list := fmt.Sprintf("Connections status: %v\n", h.VoiceState.connections)
 	utils.GenerateResponse(s, i, discordgo.InteractionResponseChannelMessageWithSource, list)
 }
 
